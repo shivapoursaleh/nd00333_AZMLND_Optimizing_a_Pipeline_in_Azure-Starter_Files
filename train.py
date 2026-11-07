@@ -16,7 +16,10 @@ def clean_data(data):
     weekdays = {"mon":1, "tue":2, "wed":3, "thu":4, "fri":5, "sat":6, "sun":7}
 
     # Clean and one hot encode data
-    x_df = data.to_pandas_dataframe().dropna()
+    if hasattr(data, "to_pandas_dataframe"):
+        x_df = data.to_pandas_dataframe().dropna()
+    else:
+        x_df = data.dropna()
     jobs = pd.get_dummies(x_df.job, prefix="job")
     x_df.drop("job", inplace=True, axis=1)
     x_df = x_df.join(jobs)
@@ -48,25 +51,40 @@ def main():
 
     run = Run.get_context()
 
-    run.log("Regularization Strength:", np.float(args.C))
-    run.log("Max iterations:", np.int(args.max_iter))
+    run.log("Regularization Strength:", float(args.C))
+    run.log("Max iterations:", int(args.max_iter))
 
     # TODO: Create TabularDataset using TabularDatasetFactory
     # Data is located at:
     # "https://automlsamplenotebookdata.blob.core.windows.net/automl-sample-notebook-data/bankmarketing_train.csv"
 
-    ds = ### YOUR CODE HERE ###
-    
+    # ds = ### YOUR CODE HERE ###
+    url = "https://automlsamplenotebookdata.blob.core.windows.net/automl-sample-notebook-data/bankmarketing_train.csv"
+    try:
+        ds = TabularDatasetFactory.from_delimited_files(path=url)
+        ds.take(1).to_pandas_dataframe()
+    except Exception as e:
+        print("TabularDatasetFactory not supported here, using local CSV copy:", e)
+        if os.path.exists("bankmarketing_train.csv"):
+            ds = pd.read_csv("bankmarketing_train.csv")
+        else:
+            ds = pd.read_csv(url)
+
     x, y = clean_data(ds)
 
     # TODO: Split data into train and test sets.
 
-    ### YOUR CODE HERE ###a
+    ### YOUR CODE HERE ###
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
     model = LogisticRegression(C=args.C, max_iter=args.max_iter).fit(x_train, y_train)
 
     accuracy = model.score(x_test, y_test)
-    run.log("Accuracy", np.float(accuracy))
+    run.log("Accuracy", float(accuracy))
+
+    # Save the model
+    os.makedirs("outputs", exist_ok=True)
+    joblib.dump(model, "outputs/model.joblib")
 
 if __name__ == '__main__':
     main()
